@@ -115,7 +115,7 @@ ggplot(
 gg
 
 # make the final map
-ggplot() +
+gf <- ggplot() +
   geom_sf( # gray base layer for the outline
     data = nz,
     size = 2,
@@ -173,3 +173,6 @@ ggplot() +
     )
   )
 
+gf
+
+ggsave("volcano.png", gf, width = 5, height = 8)
