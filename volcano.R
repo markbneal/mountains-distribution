@@ -1,23 +1,67 @@
+# Modified to plot NZ volcanoes
+
 library(sf)
 library(rvest)
 library(ggdist)
-library(hrbragg) # remotes::install_github("hrbrmstr/hrbragg") # or use another theme
-library(ggsflabel) # remotes::install_github("yutannihilation/ggsflabel")
+# remotes::install_github("hrbrmstr/hrbragg") # or use another theme
+#‘ragg’, ‘textshaping’ causing dramas
+# install.packages("textshaping") # these require installs on the server, https://harfbuzz.github.io/building.html
+# install.packages("ragg")
+library(hrbragg) # 
+#remotes::install_github("yutannihilation/ggsflabel")
+library(ggsflabel) # 
 library(tidyverse)
+library(stringi)
+#install.packages("lares")
+library(lares)
 
 # this uses the R native pipe, so if folks are on older R versions, swap that out
 # for the {magrittr} pipe.
 
 # Ísland shapefile
 # https://geodata.lib.berkeley.edu/download/file/stanford-dq155fd3935-shapefile.zip
-ice <- st_read("./stanford-dq155fd3935-shapefile/dq155fd3935.shp")
+# ice <- st_read("./stanford-dq155fd3935-shapefile/dq155fd3935.shp")
+
+# NZ shapefile
+# https://geodata.lib.berkeley.edu/download/file/stanford-db272jt5872-shapefile.zip
+# Run in terminal to download zip
+# curl -s https://geodata.lib.berkeley.edu/download/file/stanford-db272jt5872-shapefile.zip -o stanford-db272jt5872-shapefile.zip
+
+# unzip("stanford-db272jt5872-shapefile.zip", exdir = "stanford-db272jt5872-shapefile")
+nz <- st_read("./stanford-db272jt5872-shapefile/db272jt5872.shp")
+
 
 # Ísland volcano geo information
 # https://kmlexport.toolforge.org/?article=List_of_volcanoes_in_Iceland
 vol <- st_read("doc.kml")
 
-# Ísland volcano height info
-pg <- read_html("https://en.wikipedia.org/wiki/List_of_volcanoes_in_Iceland") 
+# Ísland volcano geo information
+# curl -s https://kmlexport.toolforge.org/?article=List_of_volcanoes_in_New_Zealand -o doc.kml
+vol <- st_read("doc.kml") # Bad news, multiple layers to extract
+
+
+## Ísland volcano height info
+# pg <- read_html("https://en.wikipedia.org/wiki/List_of_volcanoes_in_Iceland") 
+# 
+# html_table(pg)[[2]] |> 
+#   select(name=Name, elev=2) |> 
+#   filter(elev != "(m)") |> 
+#   mutate(
+#     elev = as.numeric(stri_replace_all_regex(elev, "[^[:digit:]]", ""))
+#   ) |> 
+#   filter(elev > 0) -> height
+
+# NZ volcano height info
+pg <- read_html("https://en.wikipedia.org/wiki/List_of_volcanoes_in_New_Zealand") 
+
+#NZ has 6 tables!
+
+html_table(pg)[[1]]
+html_table(pg)[[2]]
+html_table(pg)[[3]]
+html_table(pg)[[4]]
+html_table(pg)[[5]]
+html_table(pg)[[6]]
 
 html_table(pg)[[2]] |> 
   select(name=Name, elev=2) |> 
@@ -26,6 +70,7 @@ html_table(pg)[[2]] |>
     elev = as.numeric(stri_replace_all_regex(elev, "[^[:digit:]]", ""))
   ) |> 
   filter(elev > 0) -> height
+
 
 # make the raincloud distribution chart
 
@@ -61,47 +106,48 @@ ggplot(
     x = NULL, y = NULL,
     title = "Volcano Height Distribution (m)"
   ) +
-  theme_cs(grid="XY", plot_title_size = 14) +
+  #theme_cs(grid="XY", plot_title_size = 14) +
   theme(
     axis.text.y.left = element_blank(),
     plot.background =  element_rect(fill = "transparent", color = "transparent"),
     panel.background = element_rect(fill = "transparent", color = "transparent")
   ) -> gg
+gg
 
 # make the final map
 ggplot() +
   geom_sf( # gray base layer for the outline
-    data = ice,
+    data = nz,
     size = 2,
     fill = "white",
     color = "gray90"
   ) +
   geom_sf( # the ísland map
-    data = ice,
+    data = nz,
     size = 0.125,
     fill = "white"
   ) +
   geom_sf_text( # the volcano emoji's (only the ones that are on the raised continent)
-    data = vol |> filter(!(Name %in% c("Kolbeinsey", "Reykjaneshryggur", "Helgafell", "Jólnir", "Eldfell", "Surtsey"))),
-    aes(label = "⛰")
-  ) +
+    data = vol, # |> filter(!(Name %in% c("Kolbeinsey", "Reykjaneshryggur", "Helgafell", "Jólnir", "Eldfell", "Surtsey"))),
+    aes(label = "*")  #"⛰")  #N eds  ragg etc to plot this
+    ) +
   geom_sf_text_repel( # the volcano names (only the ones that are on the raised continent)
-    data = vol |> filter(!(Name %in% c("Kolbeinsey", "Reykjaneshryggur", "Helgafell", "Jólnir", "Eldfell","Surtsey"))),
+    data = vol, # |> filter(!(Name %in% c("Kolbeinsey", "Reykjaneshryggur", "Helgafell", "Jólnir", "Eldfell","Surtsey"))),
     aes(
       label = Name
-    ),
-    family = clear_sans_pkg$bold # if {hrbragg} is not usable, choose a diff font
+    )#,
+    #family = clear_sans_pkg$bold # if {hrbragg} is not usable, choose a diff font
   ) +
-  annotation_custom( # place the raincloud distribution chart
-    grob = ggplotGrob(gg2),
-    xmin = -22, 
-    xmax = -18,
-    ymin = 66.06,
-    ymax = 67.04
-  ) +
+  # annotation_custom( # place the raincloud distribution chart
+  #   grob = ggplotGrob(gg2),
+  #   xmin = -22, 
+  #   xmax = -18,
+  #   ymin = 66.06,
+  #   ymax = 67.04
+  # ) +
   coord_sf( # crop the map and remove the graticules
-    xlim = c(-24.5, -13.25),
-    ylim = c(63.25, 66.75),
+    xlim = c(163, 179.9),
+    ylim = c(-26, -48),
     datum = NA
   ) +
   annotate( # add the "title"
@@ -110,16 +156,16 @@ ggplot() +
     y = 63.4,
     vjust = 0,
     hjust = 1,
-    label = "The Volcanoes of Ísland",
-    family = clear_sans_pkg$bold,
+    label = "The Volcanoes of New Zealand",
+    #family = clear_sans_pkg$bold,
     size = 10
   ) +
   labs(
     x = NULL, y = NULL
   ) +
-  theme_cs(
-    grid = ""
-  ) +
+  # theme_cs(
+  #   grid = ""
+  # ) +
   theme(
     panel.background = element_rect( # "ocean blue"
       color = NA, 
